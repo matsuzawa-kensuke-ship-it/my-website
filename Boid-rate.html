@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像解析ツール</title>
+
+    <script>
+        // Tailwind CSSのCDNがブロックされた場合のフォールバック用CSS注入関数
+        function applyFallbackCSS() {
+            console.warn("Tailwind CSSのCDN読み込みがブロックされました。フォールバックCSSを適用します。");
+            const style = document.createElement('style');
+            style.textContent = `
+                /* 簡易リセットと基本スタイル */
+                *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+                body { margin: 0; line-height: inherit; }
+                button { cursor: pointer; background: transparent; padding: 0; color: inherit; }
+                input, textarea, button { font-family: inherit; font-size: inherit; line-height: inherit; }
+                
+                /* Tailwindユーティリティクラスのフォールバック */
+                .h-screen { height: 100vh; }
+                .flex { display: flex; }
+                .flex-col { flex-direction: column; }
+                .flex-1 { flex: 1 1 0%; }
+                .grid { display: grid; }
+                .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+                .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+                .grid-cols-10 { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+                .col-span-1 { grid-column: span 1 / span 1; }
+                .col-span-2 { grid-column: span 2 / span 2; }
+                .gap-1 { gap: 0.25rem; }
+                .gap-2 { gap: 0.5rem; }
+                .gap-y-1 { row-gap: 0.25rem; }
+                .space-x-1 > :not([hidden]) ~ :not([hidden]) { margin-left: 0.25rem; }
+                .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0.5rem; }
+                .items-center { align-items: center; }
+                .justify-between { justify-content: space-between; }
+                .shrink-0 { flex-shrink: 0; }
+                .w-full { width: 100%; }
+                .w-16 { width: 4rem; }
+                .w-32 { width: 8rem; }
+                .h-24 { height: 6rem; }
+                .min-h-0 { min-height: 0; }
+                .p-1 { padding: 0.25rem; }
+                .p-2 { padding: 0.5rem; }
+                .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+                .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+                .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+                .px-4 { padding-left: 1rem; padding-right: 1rem; }
+                .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+                .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+                .mb-2 { margin-bottom: 0.5rem; }
+                .ml-4 { margin-left: 1rem; }
+                .ml-auto { margin-left: auto; }
+                .text-xs { font-size: 0.75rem; line-height: 1rem; }
+                .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+                .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+                .font-bold { font-weight: 700; }
+                .font-semibold { font-weight: 600; }
+                .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+                .text-center { text-align: center; }
+                .text-right { text-align: right; }
+                .whitespace-nowrap { white-space: nowrap; }
+                .bg-white { background-color: #fff; }
+                .bg-gray-50 { background-color: #f9fafb; }
+                .bg-gray-100 { background-color: #f3f4f6; }
+                .bg-gray-200 { background-color: #e5e7eb; }
+                .bg-blue-100 { background-color: #dbeafe; }
+                .bg-blue-600 { background-color: #2563eb; }
+                .bg-blue-800 { background-color: #1e40af; }
+                .bg-red-100 { background-color: #fee2e2; }
+                .bg-red-500 { background-color: #ef4444; }
+                .bg-green-600 { background-color: #16a34a; }
+                .text-white { color: #fff; }
+                .text-gray-800 { color: #1f2937; }
+                .text-red-800 { color: #991b1b; }
+                .text-blue-800 { color: #1e40af; }
+                .border { border-width: 1px; }
+                .border-t { border-top-width: 1px; }
+                .border-b { border-bottom-width: 1px; }
+                .border-gray-300 { border-color: #d1d5db; }
+                .border-gray-400 { border-color: #9ca3af; }
+                .border-red-300 { border-color: #fca5a5; }
+                .border-blue-300 { border-color: #93c5fd; }
+                .rounded { border-radius: 0.25rem; }
+                .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); }
+                .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+                .overflow-hidden { overflow: hidden; }
+                .relative { position: relative; }
+                .hidden { display: none !important; }
+                .resize-none { resize: none; }
+                .focus\\:outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+                .hover\\:bg-gray-300:hover { background-color: #d1d5db; }
+                .hover\\:bg-blue-200:hover { background-color: #bfdbfe; }
+                .hover\\:bg-blue-700:hover { background-color: #1d4ed8; }
+                .hover\\:bg-red-200:hover { background-color: #fecaca; }
+                .hover\\:bg-red-600:hover { background-color: #dc2626; }
+                .hover\\:bg-green-700:hover { background-color: #15803d; }
+                .flex-wrap { flex-wrap: wrap; }
+                @media (min-width: 768px) {
+                    .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com" onerror="applyFallbackCSS()"></script>
+    
+    <script>
+        // ExcelJSの代替CDN（予備サーバー）読み込み関数
+        function loadFallbackExcelJS() {
+            console.warn("メインのExcelJS CDNがブロックされました。予備のCDN(unpkg)から読み込みます。");
+            const script = document.createElement('script');
+            script.src = "https://unpkg.com/exceljs@4.3.0/dist/exceljs.min.js";
+            
+            // 予備のサーバーもブロックされた場合の最終手段
+            script.onerror = function() {
+                console.warn("予備のCDNもブロックされました。ローカルの exceljs.min.js を読み込みます。");
+                const localScript = document.createElement('script');
+                localScript.src = "exceljs.min.js";
+                document.head.appendChild(localScript);
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" onerror="loadFallbackExcelJS()"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .canvas-container {
+            position: relative;
+            background-color: #2d3748; /* gray-800 */
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            border: 1px solid #4a5568;
+            border-radius: 0.25rem;
+            cursor: crosshair;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+        }
+        /* スクロールバーのカスタマイズ */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-100 text-gray-800 text-sm overflow-hidden">
+
+    <!-- ヘッダー -->
+    <header class="bg-blue-600 text-white p-2 shadow-md flex justify-between items-center shrink-0">
+        <h1 class="text-lg font-bold">画像解析ツール</h1>
+        <div class="flex space-x-2">
+            <button id="btnSaveSettings" class="bg-blue-800 hover:bg-blue-700 px-3 py-1 rounded text-xs">設定を保存</button>
+            <input type="file" id="inputLoadSettings" accept=".json" class="hidden">
+            <button id="btnLoadSettings" class="bg-blue-800 hover:bg-blue-700 px-3 py-1 rounded text-xs" onclick="document.getElementById('inputLoadSettings').click()">設定を読み込み</button>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ（3カラム） -->
+    <main class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 p-2 min-h-0">
+        
+        <!-- 左ペイン -->
+        <div class="bg-white rounded shadow flex flex-col border border-gray-300">
+            <div class="bg-gray-200 px-2 py-1 font-semibold border-b border-gray-300">左: 必要範囲の選択</div>
+            <div class="flex-1 p-2 flex flex-col relative">
+                <div class="canvas-container flex-1 mb-2" id="leftCanvasContainer"></div>
+                <div class="flex space-x-2 shrink-0">
+                    <input type="file" id="inputLeftImage" accept="image/*" class="hidden">
+                    <button class="bg-gray-200 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded text-xs" onclick="document.getElementById('inputLeftImage').click()">画像を開く</button>
+                    <button id="btnApplyLeft" class="bg-gray-200 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded text-xs">選択範囲を中央に適用</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央ペイン -->
+        <div class="bg-white rounded shadow flex flex-col border border-gray-300">
+            <div class="bg-gray-200 px-2 py-1 font-semibold border-b border-gray-300">中央: エッジ検出によるトリミング（青線）</div>
+            <div class="flex-1 p-2 flex flex-col relative">
+                <div class="canvas-container flex-1 mb-2" id="centerCanvasContainer">
+                    <!-- 中央は描画用キャンバスのみ（操作なし） -->
+                    <canvas id="centerCanvas"></canvas>
+                </div>
+                <div class="shrink-0 flex flex-col space-y-2">
+                    <div class="grid grid-cols-4 gap-2 items-center text-xs">
+                        <label class="text-right">平滑化</label>
+                        <input type="number" id="paramBlur" value="5" class="border px-1 w-full">
+                        <label class="text-right">エッジ低</label>
+                        <input type="number" id="paramEdgeLow" value="50" class="border px-1 w-full">
+                        <label class="text-right">エッジ高</label>
+                        <input type="number" id="paramEdgeHigh" value="150" class="border px-1 w-full">
+                        <label class="text-right">モルフォロジー</label>
+                        <input type="number" id="paramMorph" value="3" class="border px-1 w-full">
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="btnRunEdge" class="bg-gray-200 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded text-xs">エッジ検出を実行</button>
+                        <button id="btnApplyCenter" class="bg-gray-200 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded text-xs">検出結果を右に適用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右ペイン -->
+        <div class="bg-white rounded shadow flex flex-col border border-gray-300">
+            <div class="bg-gray-200 px-2 py-1 font-semibold border-b border-gray-300">右: 二値化範囲選択（矩形をドラッグで作成）</div>
+            <div class="flex-1 p-2 flex flex-col relative">
+                <div class="canvas-container flex-1 mb-2" id="rightCanvasContainer"></div>
+                <div class="shrink-0 flex flex-col space-y-2 text-xs">
+                    <div class="flex items-center space-x-2">
+                        <label class="w-16">二値化閾値</label>
+                        <input type="range" id="rangeThreshold" min="0" max="255" value="65" class="flex-1">
+                        <input type="number" id="valThreshold" value="65.0" step="0.1" class="border px-1 w-16 text-right">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label class="w-16">目標輝度</label>
+                        <input type="range" id="rangeBrightness" min="0" max="255" value="128" class="flex-1">
+                        <input type="number" id="valBrightness" value="128.0" step="0.1" class="border px-1 w-16 text-right">
+                    </div>
+                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <button id="btnDeleteRect" class="bg-red-100 hover:bg-red-200 border border-red-300 text-red-800 px-2 py-1 rounded">選択矩形を削除</button>
+                        <button id="btnToggleRef" class="bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-800 px-2 py-1 rounded">目標輝度矩形に設定/解除</button>
+                        <label class="flex items-center space-x-1 ml-auto">
+                            <input type="checkbox" id="chkIgnoreVoid" checked>
+                            <span>最大ボイドを背景扱いにする</span>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-10 gap-1 items-center bg-gray-50 p-1 border rounded">
+                        <label class="col-span-2 text-right">選択idx:</label>
+                        <input type="text" id="selIdx" readonly class="col-span-1 border bg-gray-100 px-1 text-center">
+                        <label class="text-right">x1:</label><input type="number" id="selX1" class="border px-1">
+                        <label class="text-right">y1:</label><input type="number" id="selY1" class="border px-1">
+                        <label class="text-right">x2:</label><input type="number" id="selX2" class="border px-1">
+                        <label class="text-right">y2:</label><input type="number" id="selY2" class="border px-1">
+                        <button id="btnApplyCoords" class="col-span-2 bg-gray-200 hover:bg-gray-300 border border-gray-400 px-1 py-1 rounded">適用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 下部コンソール -->
+    <footer class="bg-white border-t border-gray-300 p-2 shrink-0 flex flex-col space-y-2">
+        <div class="flex items-center space-x-2 text-xs">
+            <label class="font-semibold whitespace-nowrap">対象フォルダ:</label>
+            <input type="text" id="txtDir" readonly class="border px-2 py-1 flex-1 bg-gray-100" placeholder="フォルダを選択してください...">
+            <input type="file" id="inputDir" webkitdirectory directory multiple class="hidden">
+            <button class="bg-gray-200 hover:bg-gray-300 border border-gray-400 px-3 py-1 rounded whitespace-nowrap" onclick="document.getElementById('inputDir').click()">参照</button>
+
+            <label class="font-semibold whitespace-nowrap ml-4">ファイルキーワード:</label>
+            <input type="text" id="txtKeyword" class="border px-2 py-1 w-32">
+        </div>
+        <div class="flex items-center space-x-2 text-xs">
+            <label class="font-semibold whitespace-nowrap">出力Excel名:</label>
+            <input type="text" id="txtOutput" value="result.xlsx" class="border px-2 py-1 flex-1">
+            <div class="ml-auto flex space-x-2">
+                <button id="btnStartBatch" class="bg-green-600 hover:bg-green-700 text-white px-6 py-1 rounded font-bold shadow">一括処理開始</button>
+                <button id="btnStopBatch" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded font-bold shadow" disabled>停止</button>
+            </div>
+        </div>
+        <textarea id="logArea" class="w-full h-24 border border-gray-300 bg-gray-50 p-1 text-xs font-mono resize-none focus:outline-none" readonly></textarea>
+    </footer>
+
+<script>
+/**
+ * 画像解析ツール (JS実装)
+ */
+
+// --- ユーティリティ ---
+function log(msg) {
+    const area = document.getElementById('logArea');
+    area.value += msg + "\n";
+    area.scrollTop = area.scrollHeight;
+}
+
+// 画像の明るさ調整
+function adjustBrightness(imageData, factor) {
+    const dst = new ImageData(imageData.width, imageData.height);
+    const d = dst.data;
+    const s = imageData.data;
+    for (let i = 0; i < s.length; i += 4) {
+        d[i]   = Math.min(255, Math.max(0, s[i] * factor));
+        d[i+1] = Math.min(255, Math.max(0, s[i+1] * factor));
+        d[i+2] = Math.min(255, Math.max(0, s[i+2] * factor));
+        d[i+3] = s[i+3];
+    }
+    return dst;
+}
+
+function grayscale(imageData) {
+    const dst = new Uint8Array(imageData.width * imageData.height);
+    const s = imageData.data;
+    for (let i = 0, j = 0; i < s.length; i += 4, j++) {
+        // NTSCフォーミュラ近似
+        dst[j] = s[i]*0.299 + s[i+1]*0.587 + s[i+2]*0.114;
+    }
+    return dst;
+}
+
+// 簡易的なエッジ検出アルゴリズム (JSでのCanny代用)
+function detectInnerBBoxFromSides(grayData, width, height, blurK, edgeLow, edgeHigh, morphK) {
+    const size = width * height;
+    let img = new Uint8Array(grayData);
+
+    // 1. 簡易平滑化 (Box Blur approximation)
+    if (blurK > 1) {
+        let blurred = new Uint8Array(size);
+        const k2 = Math.floor(blurK/2);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let sum = 0, count = 0;
+                for(let dy=-k2; dy<=k2; dy++){
+                    for(let dx=-k2; dx<=k2; dx++){
+                        let nx = x+dx, ny = y+dy;
+                        if(nx>=0 && nx<width && ny>=0 && ny<height){
+                            sum += img[ny*width + nx];
+                            count++;
+                        }
+                    }
+                }
+                blurred[y*width + x] = sum / count;
+            }
+        }
+        img = blurred;
+    }
+
+    // 3. Sobel & Threshold
+    const edges = new Uint8Array(size);
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            const gx = 
+                -1 * img[idx - width - 1] + 1 * img[idx - width + 1] +
+                -2 * img[idx - 1]         + 2 * img[idx + 1] +
+                -1 * img[idx + width - 1] + 1 * img[idx + width + 1];
+            const gy = 
+                -1 * img[idx - width - 1] - 2 * img[idx - width] - 1 * img[idx - width + 1] +
+                 1 * img[idx + width - 1] + 2 * img[idx + width] + 1 * img[idx + width + 1];
+            const mag = Math.sqrt(gx*gx + gy*gy);
+            if (mag >= edgeHigh) {
+                edges[idx] = 255;
+            } else if (mag >= edgeLow) {
+                edges[idx] = 255; 
+            }
+        }
+    }
+
+    // 4. Dilation (膨張)
+    const dilated = new Uint8Array(size);
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            if(edges[idx]>0 || edges[idx-1]>0 || edges[idx+1]>0 || edges[idx-width]>0 || edges[idx+width]>0){
+                dilated[idx] = 255;
+            }
+        }
+    }
+
+    // 5. Scan
+    let left = 0, right = width - 1, top = 0, bottom = height - 1;
+    for(let x=0; x<width/2; x++){
+        let found = false;
+        for(let y=0; y<height; y++) if(dilated[y*width+x]>0){ found=true; break; }
+        if(found){ left = x; break; }
+    }
+    for(let x=width-1; x>=width/2; x--){
+        let found = false;
+        for(let y=0; y<height; y++) if(dilated[y*width+x]>0){ found=true; break; }
+        if(found){ right = x; break; }
+    }
+    for(let y=0; y<height/2; y++){
+        let found = false;
+        for(let x=0; x<width; x++) if(dilated[y*width+x]>0){ found=true; break; }
+        if(found){ top = y; break; }
+    }
+    for(let y=height-1; y>=height/2; y--){
+        let found = false;
+        for(let x=0; x<width; x++) if(dilated[y*width+x]>0){ found=true; break; }
+        if(found){ bottom = y; break; }
+    }
+
+    const margin = 2;
+    let x1 = Math.max(0, left - margin);
+    let y1 = Math.max(0, top - margin);
+    let x2 = Math.min(width, right + margin + 1);
+    let y2 = Math.min(height, bottom + margin + 1);
+
+    if (x2 <= x1 || y2 <= y1) {
+        return { bbox: [0, 0, width, height], edges: dilated };
+    }
+    return { bbox: [x1, y1, x2, y2], edges: dilated };
+}
+
+// 連結成分のラベリングと面積計算（ボイド解析）
+function highlightSolderAndVoidArea(grayData, width, height, thresholdSolder, ignoreLargestVoid) {
+    const size = width * height;
+    const binarySolder = new Uint8Array(size); // 1: solder
+    const binaryVoid = new Uint8Array(size);   // 1: potential void
+
+    let solderArea = 0;
+    for (let i = 0; i < size; i++) {
+        if (grayData[i] < thresholdSolder) {
+            binarySolder[i] = 1;
+            solderArea++;
+        } else {
+            binaryVoid[i] = 1;
+        }
+    }
+
+    // ラベリング処理 (BFS)
+    const labels = new Int32Array(size);
+    let currentLabel = 1;
+    const areas = []; // label -> area
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            if (binaryVoid[idx] === 1 && labels[idx] === 0) {
+                // BFS開始
+                let area = 0;
+                const queue = [idx];
+                labels[idx] = currentLabel;
+                let head = 0;
+
+                while (head < queue.length) {
+                    const curr = queue[head++];
+                    area++;
+                    const cx = curr % width;
+                    const cy = Math.floor(curr / width);
+
+                    // 4近傍
+                    if (cx > 0) { const n = curr - 1; if (binaryVoid[n] && !labels[n]) { labels[n] = currentLabel; queue.push(n); } }
+                    if (cx < width - 1) { const n = curr + 1; if (binaryVoid[n] && !labels[n]) { labels[n] = currentLabel; queue.push(n); } }
+                    if (cy > 0) { const n = curr - width; if (binaryVoid[n] && !labels[n]) { labels[n] = currentLabel; queue.push(n); } }
+                    if (cy < height - 1) { const n = curr + width; if (binaryVoid[n] && !labels[n]) { labels[n] = currentLabel; queue.push(n); } }
+                }
+                areas.push({ label: currentLabel, area: area });
+                currentLabel++;
+            }
+        }
+    }
+
+    // 最大ボイドの特定
+    let maxLabel = -1;
+    let maxArea = -1;
+    for (let i = 0; i < areas.length; i++) {
+        if (areas[i].area > maxArea) {
+            maxArea = areas[i].area;
+            maxLabel = areas[i].label;
+        }
+    }
+
+    let voidArea = 0;
+    
+    // RGB画像構築
+    const rgbData = new Uint8ClampedArray(size * 4);
+    for (let i = 0; i < size; i++) {
+        const outIdx = i * 4;
+        if (binarySolder[i] === 1) {
+            rgbData[outIdx] = 0;     // R
+            rgbData[outIdx+1] = 255; // G
+            rgbData[outIdx+2] = 0;   // B
+            rgbData[outIdx+3] = 255;
+        } else {
+            const lbl = labels[i];
+            if (lbl > 0) {
+                if (ignoreLargestVoid && lbl === maxLabel) {
+                    // 背景扱い (白)
+                    rgbData[outIdx] = 255; rgbData[outIdx+1] = 255; rgbData[outIdx+2] = 255; rgbData[outIdx+3] = 255;
+                } else {
+                    // ピンク
+                    rgbData[outIdx] = 255; rgbData[outIdx+1] = 105; rgbData[outIdx+2] = 180; rgbData[outIdx+3] = 255;
+                    voidArea++;
+                }
+            } else {
+                rgbData[outIdx] = 255; rgbData[outIdx+1] = 255; rgbData[outIdx+2] = 255; rgbData[outIdx+3] = 255;
+            }
+        }
+    }
+
+    return {
+        imageData: new ImageData(rgbData, width, height),
+        voidArea: voidArea,
+        solderArea: solderArea
+    };
+}
+
+
+// --- Canvas Editor システム ---
+class EditableRect {
+    constructor(editor, x1, y1, x2, y2, idx, isBrightnessRef = false) {
+        this.editor = editor;
+        this.idx = idx;
+        this.x1 = Math.min(x1, x2);
+        this.y1 = Math.min(y1, y2);
+        this.x2 = Math.max(x1, x2);
+        this.y2 = Math.max(y1, y2);
+        this.selected = false;
+        this.isBrightnessRef = isBrightnessRef;
+        this.overlayData = null; // 二値化画像プレビュー用 (ImageData)
+    }
+
+    contains(x, y) {
+        return x >= this.x1 && x <= this.x2 && y >= this.y1 && y <= this.y2;
+    }
+
+    getHandleAt(x, y) {
+        const hs = 6 / this.editor.scale; // 表示上のサイズに合わせる
+        const corners = {
+            nw: [this.x1, this.y1],
+            ne: [this.x2, this.y1],
+            sw: [this.x1, this.y2],
+            se: [this.x2, this.y2]
+        };
+        for (let key in corners) {
+            const [cx, cy] = corners[key];
+            if (Math.abs(cx - x) <= hs && Math.abs(cy - y) <= hs) return key;
+        }
+        return null;
+    }
+}
+
+class CanvasEditor {
+    constructor(containerId, allowMultiple) {
+        this.container = document.getElementById(containerId);
+        this.canvas = document.createElement('canvas');
+        this.overlayCanvas = document.createElement('canvas'); // 二値化等のオーバーレイ用
+        this.uiCanvas = document.createElement('canvas'); // 矩形描画用
+        
+        [this.canvas, this.overlayCanvas, this.uiCanvas].forEach(c => {
+            c.style.position = 'absolute';
+            c.style.top = '0';
+            c.style.left = '0';
+            c.style.transformOrigin = 'top left';
+            this.container.appendChild(c);
+        });
+
+        this.ctx = this.canvas.getContext('2d');
+        this.overlayCtx = this.overlayCanvas.getContext('2d');
+        this.uiCtx = this.uiCanvas.getContext('2d');
+        
+        this.allowMultiple = allowMultiple;
+        this.rects = [];
+        this.image = null; // HTMLImageElement or HTMLCanvasElement
+        this.scale = 1.0;
+
+        // イベント状態
+        this.isDragging = false;
+        this.dragStart = null;
+        this.activeRect = null;
+        this.activeHandle = null;
+        this.tempRect = null;
+
+        this.onSelectionChanged = null;
+
+        this._bindEvents();
+        window.addEventListener('resize', () => this.resizeAndDraw());
+    }
+
+    loadImage(imgSrc) {
+        this.image = imgSrc;
+        this.canvas.width = imgSrc.width;
+        this.canvas.height = imgSrc.height;
+        this.overlayCanvas.width = imgSrc.width;
+        this.overlayCanvas.height = imgSrc.height;
+        this.uiCanvas.width = imgSrc.width;
+        this.uiCanvas.height = imgSrc.height;
+        
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.drawImage(imgSrc, 0, 0);
+        
+        this.resizeAndDraw();
+    }
+
+    resizeAndDraw() {
+        if (!this.image) return;
+        const cw = this.container.clientWidth;
+        const ch = this.container.clientHeight;
+        const iw = this.image.width;
+        const ih = this.image.height;
+
+        this.scale = Math.min(cw / iw, ch / ih, 1.0);
+        const transform = `scale(${this.scale})`;
+        
+        this.canvas.style.transform = transform;
+        this.overlayCanvas.style.transform = transform;
+        this.uiCanvas.style.transform = transform;
+
+        this.drawUI();
+    }
+
+    getMousePos(e) {
+        const rect = this.uiCanvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) / this.scale,
+            y: (e.clientY - rect.top) / this.scale
+        };
+    }
+
+    _bindEvents() {
+        this.uiCanvas.addEventListener('mousedown', e => {
+            if (!this.image) return;
+            const pos = this.getMousePos(e);
+            
+            if (e.button === 2) { // 右クリック
+                for (let i = this.rects.length - 1; i >= 0; i--) {
+                    if (this.rects[i].contains(pos.x, pos.y)) {
+                        if (confirm(`矩形 ${this.rects[i].idx} を削除しますか？`)) {
+                            this.rects.splice(i, 1);
+                            if(this.onSelectionChanged) this.onSelectionChanged(null);
+                            this.drawUI();
+                        }
+                        break;
+                    }
+                }
+                return;
+            }
+
+            // ハンドルチェック
+            for (let i = this.rects.length - 1; i >= 0; i--) {
+                const handle = this.rects[i].getHandleAt(pos.x, pos.y);
+                if (handle) {
+                    this.activeRect = this.rects[i];
+                    this.activeHandle = handle;
+                    this.isDragging = true;
+                    this.dragStart = pos;
+                    this.selectRect(this.rects[i]);
+                    return;
+                }
+            }
+            // 内部チェック
+            for (let i = this.rects.length - 1; i >= 0; i--) {
+                if (this.rects[i].contains(pos.x, pos.y)) {
+                    this.activeRect = this.rects[i];
+                    this.activeHandle = null;
+                    this.isDragging = true;
+                    this.dragStart = pos;
+                    this.selectRect(this.rects[i]);
+                    return;
+                }
+            }
+            // 新規作成
+            this.activeRect = null;
+            this.activeHandle = null;
+            this.isDragging = true;
+            this.dragStart = pos;
+            this.tempRect = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
+            this.drawUI();
+        });
+
+        this.uiCanvas.addEventListener('mousemove', e => {
+            if (!this.isDragging) return;
+            const pos = this.getMousePos(e);
+
+            if (this.activeRect && this.activeHandle) {
+                // リサイズ
+                if (this.activeHandle.includes('w')) this.activeRect.x1 = pos.x;
+                if (this.activeHandle.includes('e')) this.activeRect.x2 = pos.x;
+                if (this.activeHandle.includes('n')) this.activeRect.y1 = pos.y;
+                if (this.activeHandle.includes('s')) this.activeRect.y2 = pos.y;
+                this.normalizeRect(this.activeRect);
+                // リアルタイム反映
+                if(this.onSelectionChanged) this.onSelectionChanged(this.activeRect);
+            } else if (this.activeRect && !this.activeHandle) {
+                // 移動
+                const dx = pos.x - this.dragStart.x;
+                const dy = pos.y - this.dragStart.y;
+                this.activeRect.x1 += dx; this.activeRect.x2 += dx;
+                this.activeRect.y1 += dy; this.activeRect.y2 += dy;
+                this.dragStart = pos;
+                // リアルタイム反映
+                if(this.onSelectionChanged) this.onSelectionChanged(this.activeRect);
+            } else if (this.tempRect) {
+                // 新規作成中
+                this.tempRect.x2 = pos.x;
+                this.tempRect.y2 = pos.y;
+            }
+            this.drawUI();
+        });
+
+        this.uiCanvas.addEventListener('mouseup', e => {
+            if (!this.isDragging) return;
+            this.isDragging = false;
+            
+            if (this.tempRect) {
+                const w = Math.abs(this.tempRect.x2 - this.tempRect.x1);
+                const h = Math.abs(this.tempRect.y2 - this.tempRect.y1);
+                if (w > 5 && h > 5) {
+                    if (!this.allowMultiple && this.rects.length > 0) {
+                        this.rects[0].x1 = Math.min(this.tempRect.x1, this.tempRect.x2);
+                        this.rects[0].y1 = Math.min(this.tempRect.y1, this.tempRect.y2);
+                        this.rects[0].x2 = Math.max(this.tempRect.x1, this.tempRect.x2);
+                        this.rects[0].y2 = Math.max(this.tempRect.y1, this.tempRect.y2);
+                        this.selectRect(this.rects[0]);
+                    } else {
+                        const nextIdx = this.rects.length > 0 ? Math.max(...this.rects.map(r=>r.idx)) + 1 : 1;
+                        const r = new EditableRect(this, this.tempRect.x1, this.tempRect.y1, this.tempRect.x2, this.tempRect.y2, nextIdx);
+                        this.rects.push(r);
+                        this.selectRect(r);
+                    }
+                }
+                this.tempRect = null;
+            } else if (this.activeRect) {
+                if(this.onSelectionChanged) this.onSelectionChanged(this.activeRect);
+            }
+            this.drawUI();
+        });
+
+        this.uiCanvas.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    normalizeRect(r) {
+        if (r.x1 > r.x2) { let t = r.x1; r.x1 = r.x2; r.x2 = t; }
+        if (r.y1 > r.y2) { let t = r.y1; r.y1 = r.y2; r.y2 = t; }
+        // 範囲制限
+        r.x1 = Math.max(0, Math.min(r.x1, this.image.width));
+        r.x2 = Math.max(0, Math.min(r.x2, this.image.width));
+        r.y1 = Math.max(0, Math.min(r.y1, this.image.height));
+        r.y2 = Math.max(0, Math.min(r.y2, this.image.height));
+    }
+
+    selectRect(rect) {
+        this.rects.forEach(r => r.selected = (r === rect));
+        if(this.onSelectionChanged) this.onSelectionChanged(rect);
+    }
+
+    clearRects() {
+        this.rects = [];
+        this.activeRect = null;
+        this.activeHandle = null;
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+        this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+        if(this.onSelectionChanged) this.onSelectionChanged(null);
+    }
+
+    clear() {
+        this.rects = [];
+        this.image = null;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+        this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+    }
+
+    drawUI() {
+        this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+
+        const hs = 4 / this.scale;
+
+        // オーバーレイ描画
+        this.rects.forEach(r => {
+            if (r.overlayData && !r.isBrightnessRef) {
+                // putImageDataは位置指定がピクセル単位なので、一時キャンバスを使う
+                const tmpCanvas = document.createElement('canvas');
+                tmpCanvas.width = r.overlayData.width;
+                tmpCanvas.height = r.overlayData.height;
+                tmpCanvas.getContext('2d').putImageData(r.overlayData, 0, 0);
+                this.overlayCtx.drawImage(tmpCanvas, r.x1, r.y1);
+            }
+        });
+
+        this.rects.forEach(r => {
+            this.uiCtx.lineWidth = 2 / this.scale;
+            this.uiCtx.strokeStyle = r.isBrightnessRef ? 'blue' : (r.selected ? 'lime' : 'red');
+            this.uiCtx.strokeRect(r.x1, r.y1, r.x2 - r.x1, r.y2 - r.y1);
+
+            // ハンドル
+            this.uiCtx.fillStyle = 'white';
+            this.uiCtx.strokeStyle = 'black';
+            this.uiCtx.lineWidth = 1 / this.scale;
+            [[r.x1, r.y1], [r.x2, r.y1], [r.x1, r.y2], [r.x2, r.y2]].forEach(([cx, cy]) => {
+                this.uiCtx.fillRect(cx - hs, cy - hs, hs*2, hs*2);
+                this.uiCtx.strokeRect(cx - hs, cy - hs, hs*2, hs*2);
+            });
+            
+            // ラベル
+            this.uiCtx.fillStyle = 'yellow';
+            this.uiCtx.font = `${14/this.scale}px Arial`;
+            this.uiCtx.fillText(`[${r.idx}]`, r.x1 + 2, r.y1 + 14/this.scale);
+        });
+
+        if (this.tempRect) {
+            this.uiCtx.lineWidth = 2 / this.scale;
+            this.uiCtx.strokeStyle = 'cyan';
+            this.uiCtx.setLineDash([4/this.scale, 4/this.scale]);
+            this.uiCtx.strokeRect(this.tempRect.x1, this.tempRect.y1, this.tempRect.x2 - this.tempRect.x1, this.tempRect.y2 - this.tempRect.y1);
+            this.uiCtx.setLineDash([]);
+        }
+    }
+}
+
+
+// --- アプリケーション状態 ---
+const AppState = {
+    leftImage: null, // original HTMLImageElement
+    leftCropBox: null,
+    centerCroppedCanvas: null, // 左クロップ後のキャンバス
+    centerBBox: null,
+    rightAppliedCanvas: null, // エッジ検出でトリミングされたキャンバス
+    batchStopFlag: false
+};
+
+// UI初期化
+const leftEditor = new CanvasEditor('leftCanvasContainer', false);
+const rightEditor = new CanvasEditor('rightCanvasContainer', true);
+const centerCanvas = document.getElementById('centerCanvas');
+const centerCtx = centerCanvas.getContext('2d');
+
+// --- イベントバインディング ---
+
+// 左画像読み込み
+document.getElementById('inputLeftImage').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+        const img = new Image();
+        img.onload = () => {
+            AppState.leftImage = img;
+            leftEditor.clearRects(); // 矩形クリア
+            leftEditor.loadImage(img);
+            log(`左画像を読み込み: ${file.name}`);
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// 左クロップ -> 中央
+document.getElementById('btnApplyLeft').addEventListener('click', () => {
+    if (!AppState.leftImage) return alert('左画像がありません');
+    let sx=0, sy=0, sw=AppState.leftImage.width, sh=AppState.leftImage.height;
+    
+    if (leftEditor.rects.length > 0) {
+        const r = leftEditor.rects[0];
+        sx = Math.max(0, Math.floor(r.x1));
+        sy = Math.max(0, Math.floor(r.y1));
+        sw = Math.floor(r.x2 - r.x1);
+        sh = Math.floor(r.y2 - r.y1);
+        AppState.leftCropBox = [sx, sy, sx+sw, sy+sh];
+    } else {
+        AppState.leftCropBox = null;
+    }
+
+    if(sw <= 0 || sh <= 0) return alert('クロップ範囲が不正です');
+
+    const c = document.createElement('canvas');
+    c.width = sw; c.height = sh;
+    c.getContext('2d').drawImage(AppState.leftImage, sx, sy, sw, sh, 0, 0, sw, sh);
+    AppState.centerCroppedCanvas = c;
+    
+    updateCenterPreview();
+    log('左クロップを中央に適用しました');
+});
+
+function updateCenterPreview() {
+    if (!AppState.centerCroppedCanvas) return;
+    const srcCanvas = AppState.centerCroppedCanvas;
+    const ctx = srcCanvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+    const gray = grayscale(imgData);
+
+    const blur = parseInt(document.getElementById('paramBlur').value) || 5;
+    const low = parseInt(document.getElementById('paramEdgeLow').value) || 50;
+    const high = parseInt(document.getElementById('paramEdgeHigh').value) || 150;
+    const morph = parseInt(document.getElementById('paramMorph').value) || 3;
+
+    const { bbox, edges } = detectInnerBBoxFromSides(gray, srcCanvas.width, srcCanvas.height, blur, low, high, morph);
+    AppState.centerBBox = bbox;
+
+    // プレビュー描画
+    centerCanvas.width = srcCanvas.width;
+    centerCanvas.height = srcCanvas.height;
+    centerCtx.drawImage(srcCanvas, 0, 0);
+    centerCtx.strokeStyle = 'blue';
+    centerCtx.lineWidth = 2;
+    centerCtx.strokeRect(bbox[0], bbox[1], bbox[2]-bbox[0], bbox[3]-bbox[1]);
+    
+    // 表示サイズ調整
+    const container = document.getElementById('centerCanvasContainer');
+    const scale = Math.min(container.clientWidth / srcCanvas.width, container.clientHeight / srcCanvas.height, 1.0);
+    centerCanvas.style.transform = `scale(${scale})`;
+}
+
+// パラメータ変更で中央自動更新
+['paramBlur', 'paramEdgeLow', 'paramEdgeHigh', 'paramMorph'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateCenterPreview);
+});
+
+document.getElementById('btnRunEdge').addEventListener('click', updateCenterPreview);
+
+// 中央 -> 右
+document.getElementById('btnApplyCenter').addEventListener('click', () => {
+    if (!AppState.centerCroppedCanvas || !AppState.centerBBox) return alert('中央のエッジ検出結果がありません');
+    const bbox = AppState.centerBBox;
+    const w = bbox[2] - bbox[0];
+    const h = bbox[3] - bbox[1];
+    if (w <= 0 || h <= 0) return alert('検出矩形が不正です');
+
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(AppState.centerCroppedCanvas, bbox[0], bbox[1], w, h, 0, 0, w, h);
+    AppState.rightAppliedCanvas = c;
+    
+    rightEditor.clearRects();
+    updateRightPreview();
+    log('エッジ検出結果を右に適用しました');
+});
+
+// 右プレビュー更新（明るさ補正含む）
+function updateRightPreview() {
+    if (!AppState.rightAppliedCanvas) return;
+    const srcCanvas = AppState.rightAppliedCanvas;
+    const ctx = srcCanvas.getContext('2d');
+    let imgData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+
+    let factor = 1.0;
+    const refRect = rightEditor.rects.find(r => r.isBrightnessRef);
+    if (refRect) {
+        const targetBrightness = parseFloat(document.getElementById('valBrightness').value) || 128.0;
+        // 参照範囲の平均輝度計算
+        const rx1 = Math.floor(Math.max(0, refRect.x1));
+        const ry1 = Math.floor(Math.max(0, refRect.y1));
+        const rx2 = Math.floor(Math.min(srcCanvas.width, refRect.x2));
+        const ry2 = Math.floor(Math.min(srcCanvas.height, refRect.y2));
+        
+        let sum = 0, count = 0;
+        const gray = grayscale(imgData);
+        for(let y=ry1; y<ry2; y++) {
+            for(let x=rx1; x<rx2; x++) {
+                sum += gray[y*srcCanvas.width + x];
+                count++;
+            }
+        }
+        if (count > 0) {
+            const mean = sum / count;
+            if (mean > 0) factor = targetBrightness / mean;
+        }
+    }
+
+    if (factor !== 1.0) {
+        imgData = adjustBrightness(imgData, factor);
+    }
+
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = srcCanvas.width;
+    previewCanvas.height = srcCanvas.height;
+    previewCanvas.getContext('2d').putImageData(imgData, 0, 0);
+
+    rightEditor.loadImage(previewCanvas); // 内部で描画される
+    updateRightOverlays();
+}
+
+// 右二値化オーバーレイ更新
+function updateRightOverlays() {
+    if (!rightEditor.image) return;
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.canvas.width = rightEditor.image.width;
+    ctx.canvas.height = rightEditor.image.height;
+    ctx.drawImage(rightEditor.image, 0, 0);
+    const fullImgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const fullGray = grayscale(fullImgData);
+
+    const threshold = parseFloat(document.getElementById('valThreshold').value) || 65.0;
+    const ignore = document.getElementById('chkIgnoreVoid').checked;
+
+    rightEditor.rects.forEach(r => {
+        if (r.isBrightnessRef) {
+            r.overlayData = null;
+            return;
+        }
+        const x1 = Math.floor(Math.max(0, r.x1));
+        const y1 = Math.floor(Math.max(0, r.y1));
+        const x2 = Math.floor(Math.min(fullImgData.width, r.x2));
+        const y2 = Math.floor(Math.min(fullImgData.height, r.y2));
+        const w = x2 - x1;
+        const h = y2 - y1;
+        if (w <= 0 || h <= 0) return;
+
+        // サブ領域の抽出
+        const subGray = new Uint8Array(w * h);
+        for(let y=0; y<h; y++){
+            for(let x=0; x<w; x++){
+                subGray[y*w + x] = fullGray[(y1+y)*fullImgData.width + (x1+x)];
+            }
+        }
+
+        const res = highlightSolderAndVoidArea(subGray, w, h, threshold, ignore);
+        r.overlayData = res.imageData;
+    });
+    rightEditor.drawUI();
+}
+
+// 右スライダー・数値連携
+function linkRangeNum(rangeId, numId, callback) {
+    const r = document.getElementById(rangeId);
+    const n = document.getElementById(numId);
+    r.addEventListener('input', () => { n.value = r.value; if(callback) callback(); });
+    n.addEventListener('change', () => { r.value = n.value; if(callback) callback(); });
+}
+linkRangeNum('rangeThreshold', 'valThreshold', updateRightOverlays);
+linkRangeNum('rangeBrightness', 'valBrightness', updateRightPreview);
+document.getElementById('chkIgnoreVoid').addEventListener('change', updateRightOverlays);
+
+// 右ペインの選択連動
+rightEditor.onSelectionChanged = rect => {
+    if (!rect) {
+        document.getElementById('selIdx').value = '';
+        ['selX1', 'selY1', 'selX2', 'selY2'].forEach(id => document.getElementById(id).value = '');
+        updateRightOverlays(); // 選択解除・削除時にも更新
+        return;
+    }
+    document.getElementById('selIdx').value = rect.idx;
+    document.getElementById('selX1').value = Math.floor(rect.x1);
+    document.getElementById('selY1').value = Math.floor(rect.y1);
+    document.getElementById('selX2').value = Math.floor(rect.x2);
+    document.getElementById('selY2').value = Math.floor(rect.y2);
+
+    updateRightOverlays(); // 矩形作成直後、移動・リサイズ時にリアルタイムで更新
+};
+
+document.getElementById('btnApplyCoords').addEventListener('click', () => {
+    const sel = rightEditor.activeRect || rightEditor.rects.find(r=>r.selected);
+    if (!sel) return;
+    sel.x1 = parseInt(document.getElementById('selX1').value)||0;
+    sel.y1 = parseInt(document.getElementById('selY1').value)||0;
+    sel.x2 = parseInt(document.getElementById('selX2').value)||0;
+    sel.y2 = parseInt(document.getElementById('selY2').value)||0;
+    rightEditor.normalizeRect(sel);
+    updateRightOverlays();
+});
+
+document.getElementById('btnDeleteRect').addEventListener('click', () => {
+    const selIdx = rightEditor.rects.findIndex(r => r.selected);
+    if (selIdx >= 0) {
+        if(confirm(`矩形 ${rightEditor.rects[selIdx].idx} を削除しますか？`)){
+            rightEditor.rects.splice(selIdx, 1);
+            rightEditor.onSelectionChanged(null);
+            updateRightPreview();
+        }
+    }
+});
+
+document.getElementById('btnToggleRef').addEventListener('click', () => {
+    const sel = rightEditor.rects.find(r => r.selected);
+    if (!sel) return alert('矩形を選択してください');
+    
+    if (sel.isBrightnessRef) {
+        sel.isBrightnessRef = false;
+    } else {
+        rightEditor.rects.forEach(r => r.isBrightnessRef = false);
+        sel.isBrightnessRef = true;
+    }
+    updateRightPreview();
+});
+
+// --- 設定保存・読み込み ---
+document.getElementById('btnSaveSettings').addEventListener('click', () => {
+    const data = {
+        leftCropBox: AppState.leftCropBox,
+        params: {
+            blur: document.getElementById('paramBlur').value,
+            edgeLow: document.getElementById('paramEdgeLow').value,
+            edgeHigh: document.getElementById('paramEdgeHigh').value,
+            morph: document.getElementById('paramMorph').value,
+            threshold: document.getElementById('valThreshold').value,
+            brightness: document.getElementById('valBrightness').value,
+            ignoreVoid: document.getElementById('chkIgnoreVoid').checked,
+            keyword: document.getElementById('txtKeyword').value
+        },
+        rightRects: rightEditor.rects.map(r => ({
+            idx: r.idx, x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, isRef: r.isBrightnessRef
+        }))
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'settings.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    log('設定を保存しました');
+});
+
+document.getElementById('inputLoadSettings').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            AppState.leftCropBox = data.leftCropBox;
+            if(data.params){
+                document.getElementById('paramBlur').value = data.params.blur;
+                document.getElementById('paramEdgeLow').value = data.params.edgeLow;
+                document.getElementById('paramEdgeHigh').value = data.params.edgeHigh;
+                document.getElementById('paramMorph').value = data.params.morph;
+                document.getElementById('valThreshold').value = data.params.threshold;
+                document.getElementById('rangeThreshold').value = data.params.threshold;
+                document.getElementById('valBrightness').value = data.params.brightness;
+                document.getElementById('rangeBrightness').value = data.params.brightness;
+                document.getElementById('chkIgnoreVoid').checked = data.params.ignoreVoid;
+                document.getElementById('txtKeyword').value = data.params.keyword || '';
+            }
+            if(data.rightRects){
+                rightEditor.rects = data.rightRects.map(r => new EditableRect(rightEditor, r.x1, r.y1, r.x2, r.y2, r.idx, r.isRef));
+            }
+            log('設定を読み込みました');
+            
+            // 左画像があれば再適用
+            if(AppState.leftImage){
+                if(AppState.leftCropBox) {
+                    leftEditor.rects = [new EditableRect(leftEditor, AppState.leftCropBox[0], AppState.leftCropBox[1], AppState.leftCropBox[2], AppState.leftCropBox[3], 1)];
+                } else {
+                    leftEditor.clearRects();
+                }
+                leftEditor.drawUI();
+                document.getElementById('btnApplyLeft').click();
+                setTimeout(() => document.getElementById('btnApplyCenter').click(), 100);
+            }
+            
+        } catch(err) {
+            alert('設定読み込みエラー: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+});
+
+// --- 一括処理 (ExcelJS連携) ---
+let batchFiles = [];
+
+document.getElementById('inputDir').addEventListener('change', e => {
+    if(e.target.files.length > 0) {
+        document.getElementById('txtDir').value = (e.target.files[0].webkitRelativePath || "").split('/')[0] + ' フォルダ';
+        batchFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+        log(`${batchFiles.length}個の画像ファイルを検出しました`);
+    }
+});
+
+function loadCanvasFromFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = new Image();
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = img.width; c.height = img.height;
+                c.getContext('2d').drawImage(img, 0, 0);
+                resolve(c);
+            };
+            img.onerror = reject;
+            img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+document.getElementById('btnStopBatch').addEventListener('click', () => { AppState.batchStopFlag = true; });
+
+document.getElementById('btnStartBatch').addEventListener('click', async () => {
+    if (typeof ExcelJS === 'undefined') {
+        return alert("Excel出力ライブラリ(ExcelJS)が読み込めませんでした。\n一括処理を実行するには「exceljs.min.js」をこのHTMLと同じフォルダに配置してください。");
+    }
+    if(batchFiles.length === 0) return alert('対象フォルダを選択してください');
+    if(!AppState.rightAppliedCanvas) return alert('右画面に基準となる結果を適用してください');
+    
+    const keyword = document.getElementById('txtKeyword').value.toLowerCase();
+    const targetFiles = batchFiles.filter(f => f.name.toLowerCase().includes(keyword));
+    if(targetFiles.length === 0) return alert('処理対象ファイルがありません');
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Result');
+    
+    // ヘッダー設定
+    const dataRects = rightEditor.rects.filter(r => !r.isBrightnessRef).sort((a,b)=>a.idx-b.idx);
+    if(dataRects.length === 0) return alert('データ出力用矩形がありません');
+
+    const headers = ['Filename', 'TrimmedImage'];
+    dataRects.forEach(r => headers.push(`Rect_${r.idx}`));
+    ws.addRow(headers);
+    
+    ws.getColumn(1).width = 20;
+    ws.getColumn(2).width = 25;
+    for(let i=0; i<dataRects.length; i++) ws.getColumn(3+i).width = 15;
+
+    // パラメータ取得
+    const blur = parseInt(document.getElementById('paramBlur').value) || 5;
+    const low = parseInt(document.getElementById('paramEdgeLow').value) || 50;
+    const high = parseInt(document.getElementById('paramEdgeHigh').value) || 150;
+    const morph = parseInt(document.getElementById('paramMorph').value) || 3;
+    const threshold = parseFloat(document.getElementById('valThreshold').value) || 65.0;
+    const targetBright = parseFloat(document.getElementById('valBrightness').value) || 128.0;
+    const ignoreVoid = document.getElementById('chkIgnoreVoid').checked;
+    const refRect = rightEditor.rects.find(r => r.isBrightnessRef);
+    const leftCrop = AppState.leftCropBox;
+
+    AppState.batchStopFlag = false;
+    document.getElementById('btnStartBatch').disabled = true;
+    document.getElementById('btnStopBatch').disabled = false;
+    log('一括処理を開始します...');
+
+    let rowCursor = 2; // Excel行
+
+    for (let i = 0; i < targetFiles.length; i++) {
+        if(AppState.batchStopFlag) { log('処理を中断しました'); break; }
+        const file = targetFiles[i];
+        try {
+            log(`[${i+1}/${targetFiles.length}] ${file.name} 処理中...`);
+            
+            const srcCanvas = await loadCanvasFromFile(file);
+            let croppedCanvas = srcCanvas;
+
+            // 1. 左クロップ
+            if(leftCrop) {
+                const sx = Math.max(0, leftCrop[0]), sy = Math.max(0, leftCrop[1]);
+                const sw = Math.min(srcCanvas.width - sx, leftCrop[2] - leftCrop[0]);
+                const sh = Math.min(srcCanvas.height - sy, leftCrop[3] - leftCrop[1]);
+                if(sw>0 && sh>0){
+                    const c = document.createElement('canvas');
+                    c.width = sw; c.height = sh;
+                    c.getContext('2d').drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+                    croppedCanvas = c;
+                }
+            }
+
+            // 2. エッジ検出
+            const grayInfo = grayscale(croppedCanvas.getContext('2d').getImageData(0,0,croppedCanvas.width,croppedCanvas.height));
+            const { bbox } = detectInnerBBoxFromSides(grayInfo, croppedCanvas.width, croppedCanvas.height, blur, low, high, morph);
+            let trimW = bbox[2] - bbox[0], trimH = bbox[3] - bbox[1];
+            let trimmedCanvas = croppedCanvas;
+            if(trimW>0 && trimH>0){
+                const c = document.createElement('canvas');
+                c.width = trimW; c.height = trimH;
+                c.getContext('2d').drawImage(croppedCanvas, bbox[0], bbox[1], trimW, trimH, 0, 0, trimW, trimH);
+                trimmedCanvas = c;
+            }
+
+            // 3. 明るさ補正
+            let appliedFactor = 1.0;
+            let finalImgData = trimmedCanvas.getContext('2d').getImageData(0,0,trimmedCanvas.width,trimmedCanvas.height);
+            if(refRect) {
+                const rx1 = Math.floor(Math.max(0, refRect.x1)), ry1 = Math.floor(Math.max(0, refRect.y1));
+                const rx2 = Math.floor(Math.min(trimmedCanvas.width, refRect.x2)), ry2 = Math.floor(Math.min(trimmedCanvas.height, refRect.y2));
+                const tg = grayscale(finalImgData);
+                let sum=0, cnt=0;
+                for(let y=ry1; y<ry2; y++) for(let x=rx1; x<rx2; x++){ sum+=tg[y*trimmedCanvas.width+x]; cnt++; }
+                if(cnt>0 && sum/cnt > 0) appliedFactor = targetBright / (sum/cnt);
+            }
+            if(appliedFactor !== 1.0) finalImgData = adjustBrightness(finalImgData, appliedFactor);
+            
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = trimmedCanvas.width; finalCanvas.height = trimmedCanvas.height;
+            finalCanvas.getContext('2d').putImageData(finalImgData, 0, 0);
+
+            // B列へトリミング画像追加
+            const b64Trim = finalCanvas.toDataURL('image/png');
+            const trimId = wb.addImage({ base64: b64Trim, extension: 'png' });
+            ws.getCell(`A${rowCursor}`).value = file.name;
+
+            // アスペクト比を維持してスケーリング (例として1/3に縮小)
+            const trimScale = 1 / 3;
+            const targetTrimW = finalCanvas.width * trimScale;
+            const targetTrimH = finalCanvas.height * trimScale;
+            
+            ws.addImage(trimId, {
+                tl: { col: 1, row: rowCursor-1 },
+                ext: { width: targetTrimW, height: targetTrimH }
+            });
+            ws.getRow(rowCursor).height = Math.max(80, targetTrimH * 0.75); // 0.75はpx->ptの概算変換係数
+
+            // 4. 各矩形の解析
+            const fullGray = grayscale(finalImgData);
+            for(let j=0; j<dataRects.length; j++) {
+                const r = dataRects[j];
+                const colNum = 3 + j;
+                const x1 = Math.floor(Math.max(0, r.x1)), y1 = Math.floor(Math.max(0, r.y1));
+                const x2 = Math.floor(Math.min(trimmedCanvas.width, r.x2)), y2 = Math.floor(Math.min(trimmedCanvas.height, r.y2));
+                const rw = x2 - x1, rh = y2 - y1;
+                
+                if(rw>0 && rh>0){
+                    const subGray = new Uint8Array(rw * rh);
+                    for(let y=0; y<rh; y++) for(let x=0; x<rw; x++) subGray[y*rw+x] = fullGray[(y1+y)*trimmedCanvas.width + (x1+x)];
+                    
+                    const res = highlightSolderAndVoidArea(subGray, rw, rh, threshold, ignoreVoid);
+                    const sumArea = res.voidArea + res.solderArea;
+                    const bRatio = sumArea > 0 ? (res.voidArea / sumArea) : 0;
+
+                    const rc = document.createElement('canvas');
+                    rc.width = rw; rc.height = rh;
+                    rc.getContext('2d').putImageData(res.imageData, 0, 0);
+                    
+                    const b64Rect = rc.toDataURL('image/png');
+                    const rId = wb.addImage({ base64: b64Rect, extension: 'png' });
+                    
+                    // 実寸サイズをそのまま指定することでアスペクト比を維持
+                    ws.addImage(rId, {
+                        tl: { col: colNum-1, row: rowCursor-1 },
+                        ext: { width: rw, height: rh } 
+                    });
+                    
+                    // セルの幅と高さを画像サイズに合わせて拡張
+                    const currentWidth = ws.getColumn(colNum).width || 15;
+                    const requiredWidth = rw / 7; // px -> 列幅の概算変換
+                    if (requiredWidth > currentWidth) {
+                        ws.getColumn(colNum).width = requiredWidth;
+                    }
+
+                    const currentHeight = ws.getRow(rowCursor).height || 15;
+                    const requiredHeight = rh * 0.75;
+                    if (requiredHeight > currentHeight) {
+                        ws.getRow(rowCursor).height = requiredHeight;
+                    }
+
+                    ws.getCell(rowCursor+1, colNum).value = sumArea;
+                    ws.getCell(rowCursor+2, colNum).value = res.voidArea;
+                    ws.getCell(rowCursor+3, colNum).value = bRatio;
+                    ws.getCell(rowCursor+3, colNum).numFmt = '0.00%';
+                }
+            }
+            rowCursor += 4;
+            // 画面更新を許容するためのウェイト
+            await new Promise(r => setTimeout(r, 10)); 
+
+        } catch (err) {
+            log(`[エラー] ${file.name}: ${err.message}`);
+        }
+    }
+
+    if (!AppState.batchStopFlag) {
+        log('Excelファイルを生成しています...');
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = document.getElementById('txtOutput').value || 'result.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        log('一括処理とExcel保存が完了しました');
+    }
+
+    document.getElementById('btnStartBatch').disabled = false;
+    document.getElementById('btnStopBatch').disabled = true;
+});
+
+</script>
+</body>
+</html>
