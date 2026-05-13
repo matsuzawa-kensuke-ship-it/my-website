@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Viewer</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ★追加: Tailwind CSS(デザイン)がブロックされた場合のフォールバック -->
+    <script>
+        if (typeof tailwind === 'undefined') {
+            console.warn("Tailwind CSSの取得がブロックされました。代替サーバー(Unpkg)から取得します...");
+            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+        }
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/occt-import-js.js"></script>
+    <script>
+        // ★追加: CADエンジンだけでなく、Three.js(3D描画エンジン)の代替サーバーも自動で切り替える
+        let cdnBase = 'https://cdn.jsdelivr.net/npm/';
+        if (typeof occtimportjs === 'undefined') {
+            console.warn("JSDelivrからの取得がブロックされました。代替サーバー(Unpkg)へ切り替えます...");
+            document.write('<script src="https://unpkg.com/occt-import-js@0.0.22/dist/occt-import-js.js"><\/script>');
+            cdnBase = 'https://unpkg.com/'; // Three.jsの取得先も代替サーバーに変更
+        }
+
+        // Three.js の Import Map を動的に生成 (ブロックされていないサーバーを利用)
+        const importMap = {
+            imports: {
+                "three": cdnBase + "three@0.160.0/build/three.module.js",
+                "three/addons/": cdnBase + "three@0.160.0/examples/jsm/"
+            }
+        };
+        const imScript = document.createElement('script');
+        imScript.type = 'importmap';
+        imScript.textContent = JSON.stringify(importMap);
+        document.head.appendChild(imScript);
+    </script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; color: white; }
+        
+        /* CADらしいグラデーション背景 */
+        #canvas-container { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block; 
+            background: radial-gradient(circle at center, #3a3f44 0%, #1a1c1e 100%);
+        }
+        
+        /* オーバーレイ (UI要素を前面に表示) */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 50;
+        }
+        
+        .pointer-events-auto { pointer-events: auto; }
+        .hidden { display: none !important; }
+        
+        /* ローディングスピナー */
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 48px; height: 48px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* ドラッグ＆ドロップ時のスタイル変化 */
+        #drop-zone {
+            transition: all 0.2s ease;
+        }
+        #drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.15);
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="ui-container" class="absolute top-4 left-4 z-20 pointer-events-none flex flex-col gap-2 w-72">
+        <div id="file-info" class="bg-gray-800/80 backdrop-blur-md text-sm px-4 py-3 rounded-lg shadow-lg border border-gray-700 hidden pointer-events-auto">
+            <span id="file-name" class="font-bold text-gray-200 block mb-3 border-b border-gray-600 pb-2"></span>
+            <div class="flex flex-col gap-3">
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer hover:text-white transition-colors">
+                    <input type="checkbox" id="toggle-edges" checked class="rounded bg-gray-900 border-gray-600 text-blue-500 w-4 h-4 cursor-pointer">
+                    <span>モデルのエッジ(線)を表示</span>
+                </label>
+
+                <label class="flex items-center gap-2 text-gray-300 cursor-pointer hover:text-white transition-colors">
+                    <input type="checkbox" id="toggle-bg-white" class="rounded bg-gray-900 border-gray-600 text-blue-500 w-4 h-4 cursor-pointer">
+                    <span>背景を白にする</span>
+                </label>
+
+                <div class="border-t border-gray-600 pt-3">
+                    <label class="flex items-center gap-2 text-gray-300 cursor-pointer hover:text-white transition-colors mb-2">
+                        <input type="checkbox" id="toggle-clipping" class="rounded bg-gray-900 border-gray-600 text-blue-500 w-4 h-4 cursor-pointer">
+                        <span>断面表示 (クリッピング)</span>
+                    </label>
+                    <div id="clipping-sliders" class="hidden flex-col gap-3 text-xs bg-gray-900/50 p-3 rounded">
+                        <div>
+                            <div class="flex justify-between text-gray-400 mb-1">
+                                <label>X軸カット <span id="val-clip-x" class="text-white ml-1">0</span></label>
+                                <label class="flex items-center gap-1 cursor-pointer hover:text-white">
+                                    <input type="checkbox" id="flip-x" class="rounded bg-gray-800 border-gray-600 w-3 h-3"> 反転
+                                </label>
+                            </div>
+                            <input type="range" id="clip-x" class="w-full accent-blue-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-gray-400 mb-1">
+                                <label>Y軸カット <span id="val-clip-y" class="text-white ml-1">0</span></label>
+                                <label class="flex items-center gap-1 cursor-pointer hover:text-white">
+                                    <input type="checkbox" id="flip-y" class="rounded bg-gray-800 border-gray-600 w-3 h-3"> 反転
+                                </label>
+                            </div>
+                            <input type="range" id="clip-y" class="w-full accent-blue-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-gray-400 mb-1">
+                                <label>Z軸カット <span id="val-clip-z" class="text-white ml-1">0</span></label>
+                                <label class="flex items-center gap-1 cursor-pointer hover:text-white">
+                                    <input type="checkbox" id="flip-z" class="rounded bg-gray-800 border-gray-600 w-3 h-3"> 反転
+                                </label>
+                            </div>
+                            <input type="range" id="clip-z" class="w-full accent-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <label class="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-center text-sm px-4 py-2 rounded-md cursor-pointer shadow transition-colors block">
+                    <span>別のファイルを開く</span>
+                    <input type="file" class="hidden" id="file-input-reupload" accept=".stp,.step,.iges,.igs">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="parts-tree-container" class="absolute top-4 right-4 z-20 w-64 max-h-[calc(100vh-2rem)] overflow-y-auto bg-gray-800/80 backdrop-blur-md text-sm rounded-lg shadow-lg border border-gray-700 hidden pointer-events-auto flex-col scrollbar-thin scrollbar-thumb-gray-600">
+        <div class="p-3 border-b border-gray-600 font-bold text-gray-200 sticky top-0 bg-gray-800/95 z-10 flex justify-between items-center shadow-sm">
+            <span>部品リスト</span>
+            <button id="toggle-all-parts" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors text-white">全切替</button>
+        </div>
+        <div id="parts-list" class="p-2 flex flex-col gap-1">
+            </div>
+    </div>
+
+    <div class="absolute bottom-4 right-4 bg-gray-900/60 backdrop-blur px-3 py-2 rounded text-xs text-gray-400 pointer-events-none z-20">
+        左クリック: 回転 | 右クリック: 移動 | スクロール: ズーム
+    </div>
+
+    <div id="overlay">
+        <div id="drop-zone" class="bg-gray-800/80 backdrop-blur-sm border-2 border-gray-500 border-dashed rounded-2xl p-16 text-center pointer-events-auto shadow-2xl">
+            <svg class="w-20 h-20 mx-auto mb-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p class="text-2xl font-bold mb-2 text-white">STEP / IGESファイルをドロップ</p>
+            <p class="text-gray-400 mb-8 text-sm">拡張子: .step, .stp, .iges, .igs に対応</p>
+            <label class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg cursor-pointer transition-colors shadow-lg border border-gray-600 font-medium">
+                PCからファイルを選択
+                <input type="file" class="hidden" id="file-input" accept=".stp,.step,.iges,.igs">
+            </label>
+        </div>
+        
+        <div id="loading-spinner" class="hidden flex-col items-center bg-gray-900/95 backdrop-blur px-12 py-8 rounded-2xl pointer-events-auto shadow-2xl border border-gray-700">
+            <div class="loader mb-6"></div>
+            <p id="loading-text" class="text-lg font-bold text-gray-100">WASMモジュールを初期化中...</p>
+        </div>
+
+        <div id="error-box" class="hidden bg-red-900/90 backdrop-blur text-white p-8 rounded-2xl max-w-md text-center pointer-events-auto mt-4 shadow-2xl border border-red-700">
+            <svg class="w-12 h-12 mx-auto mb-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p id="error-text" class="mb-6 font-medium">エラーが発生しました。</p>
+            <button id="error-close" class="bg-red-700 hover:bg-red-600 px-6 py-2 rounded-lg font-bold transition-colors">閉じる</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let occtModule = null;
+        let scene, camera, renderer, controls;
+        let modelGroup = new THREE.Group();
+        let showEdges = true;
+        let edgeLines = []; 
+
+        let clipPlanes = [
+            new THREE.Plane(new THREE.Vector3(-1, 0, 0), 10000),
+            new THREE.Plane(new THREE.Vector3(0, -1, 0), 10000),
+            new THREE.Plane(new THREE.Vector3(0, 0, -1), 10000)
+        ];
+        let allPartsVisible = true; 
+
+        const overlay = document.getElementById('overlay');
+        const dropZoneEl = document.getElementById('drop-zone');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorBox = document.getElementById('error-box');
+        const errorText = document.getElementById('error-text');
+        const loadingText = document.getElementById('loading-text');
+
+        // アプリケーション初期化 (★フォールバック処理を実装)
+        async function init() {
+            showLoading("CADエンジン(WASM)をロード中...");
+            
+            // 複数の代替サーバー(CDN)をリストアップ
+            const wasmFallbacks = [
+                'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/occt-import-js.wasm', // 第1候補: JSDelivr
+                'https://unpkg.com/occt-import-js@0.0.22/dist/occt-import-js.wasm'            // 第2候補: Unpkg
+            ];
+
+            let wasmLoaded = false;
+
+            // リストの順番にダウンロードを試みる
+            for (const wasmUrl of wasmFallbacks) {
+                try {
+                    occtModule = await window.occtimportjs({
+                        locateFile: (path) => {
+                            if(path.endsWith('.wasm')) return wasmUrl;
+                            return path;
+                        }
+                    });
+                    wasmLoaded = true;
+                    console.log(`Successfully loaded WASM from: ${wasmUrl}`);
+                    break; // 成功したらループを抜ける
+                } catch (e) {
+                    console.warn(`Failed to load WASM from ${wasmUrl}. Trying next alternative...`, e);
+                }
+            }
+
+            // 全てのサーバーでブロックされた場合の処理
+            if (!wasmLoaded) {
+                showError("全てのサーバーからCADエンジンの読み込みに失敗しました。社内ネットワークでブロックされている可能性があります。（完全オフライン版の作成をご検討ください）");
+                return;
+            }
+
+            try {
+                initThree();
+                setupEventHandlers();
+                showDropZone();
+            } catch (e) {
+                showError("3D描画エンジンの初期化に失敗しました。");
+                console.error(e);
+            }
+        }
+
+        function initThree() {
+            scene = new THREE.Scene();
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight1.position.set(100, 100, 100);
+            scene.add(dirLight1);
+            
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight2.position.set(-100, -100, -100);
+            scene.add(dirLight2);
+
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            hemiLight.position.set(0, 200, 0);
+            scene.add(hemiLight);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.up.set(0, 0, 1);
+            camera.position.set(100, 100, 100);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.localClippingEnabled = false; 
+            
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            scene.add(modelGroup);
+
+            window.addEventListener('resize', onWindowResize);
+
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function setupEventHandlers() {
+            const fileInput = document.getElementById('file-input');
+            const fileInputReupload = document.getElementById('file-input-reupload');
+
+            const handleFileChange = (e) => {
+                if (e.target.files.length > 0) processFile(e.target.files[0]);
+                e.target.value = '';
+            };
+            fileInput.addEventListener('change', handleFileChange);
+            fileInputReupload.addEventListener('change', handleFileChange);
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZoneEl.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZoneEl.addEventListener(eventName, () => dropZoneEl.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZoneEl.addEventListener(eventName, () => dropZoneEl.classList.remove('dragover'), false);
+            });
+
+            dropZoneEl.addEventListener('drop', (e) => {
+                let dt = e.dataTransfer;
+                if (dt.files.length > 0) processFile(dt.files[0]);
+            });
+
+            document.getElementById('toggle-edges').addEventListener('change', (e) => {
+                showEdges = e.target.checked;
+                edgeLines.forEach(line => line.visible = showEdges);
+            });
+
+            document.getElementById('toggle-bg-white').addEventListener('change', (e) => {
+                const container = document.getElementById('canvas-container');
+                if (e.target.checked) {
+                    container.style.background = '#ffffff'; 
+                } else {
+                    container.style.background = ''; 
+                }
+            });
+
+            document.getElementById('toggle-clipping').addEventListener('change', (e) => {
+                renderer.localClippingEnabled = e.target.checked;
+                const sliders = document.getElementById('clipping-sliders');
+                if (e.target.checked) {
+                    sliders.classList.remove('hidden');
+                    sliders.classList.add('flex');
+                } else {
+                    sliders.classList.add('hidden');
+                    sliders.classList.remove('flex');
+                }
+            });
+
+            ['x', 'y', 'z'].forEach((axis, idx) => {
+                const slider = document.getElementById(`clip-${axis}`);
+                const flipBtn = document.getElementById(`flip-${axis}`);
+                
+                const updatePlane = () => {
+                    const val = parseFloat(slider.value);
+                    const isFlipped = flipBtn.checked;
+                    const normal = new THREE.Vector3();
+                    
+                    if (isFlipped) {
+                        if(idx === 0) normal.set(-1, 0, 0);
+                        if(idx === 1) normal.set(0, -1, 0);
+                        if(idx === 2) normal.set(0, 0, -1);
+                        clipPlanes[idx].constant = -val;
+                    } else {
+                        if(idx === 0) normal.set(1, 0, 0);
+                        if(idx === 1) normal.set(0, 1, 0);
+                        if(idx === 2) normal.set(0, 0, 1);
+                        clipPlanes[idx].constant = val;
+                    }
+                    clipPlanes[idx].normal.copy(normal);
+                    document.getElementById(`val-clip-${axis}`).innerText = val.toFixed(1);
+                };
+
+                slider.addEventListener('input', updatePlane);
+                flipBtn.addEventListener('change', updatePlane);
+            });
+
+            document.getElementById('toggle-all-parts').addEventListener('click', () => {
+                allPartsVisible = !allPartsVisible;
+                const checkboxes = document.querySelectorAll('.part-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = allPartsVisible;
+                    if (cb.meshRef) {
+                        cb.meshRef.visible = allPartsVisible;
+                        if(cb.meshRef.userData.backMesh) cb.meshRef.userData.backMesh.visible = allPartsVisible;
+                    }
+                });
+            });
+
+            document.getElementById('error-close').addEventListener('click', () => {
+                if (modelGroup.children.length > 0) {
+                    hideOverlay(); 
+                } else {
+                    showDropZone(); 
+                }
+            });
+        }
+
+        function processFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'step' && ext !== 'stp' && ext !== 'iges' && ext !== 'igs') {
+                showError("STEPまたはIGESファイルのみ対応しています。");
+                return;
+            }
+
+            const toggleClip = document.getElementById('toggle-clipping');
+            toggleClip.checked = false;
+            renderer.localClippingEnabled = false;
+            document.getElementById('clipping-sliders').classList.add('hidden');
+            document.getElementById('clipping-sliders').classList.remove('flex');
+
+            document.getElementById('file-name').innerText = file.name;
+            document.getElementById('file-info').classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                showLoading("モデルを解析・構築中... (複雑なモデルは数秒かかります)");
+                
+                setTimeout(() => {
+                    try {
+                        let result;
+                        if (ext === 'step' || ext === 'stp') {
+                            result = occtModule.ReadStepFile(data, null);
+                        } else if (ext === 'iges' || ext === 'igs') {
+                            result = occtModule.ReadIgesFile(data, null);
+                        }
+                        
+                        if (result && result.success) {
+                            buildScene(result);
+                            hideOverlay();
+                        } else {
+                            showError("ファイルの解析に失敗しました。ファイルが破損しているか、非対応の構造が含まれています。");
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        showError("システムエラーが発生しました: " + err.message);
+                    }
+                }, 100);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function buildScene(result) {
+            while(modelGroup.children.length > 0) {
+                const child = modelGroup.children[0];
+                modelGroup.remove(child);
+                if(child.geometry) child.geometry.dispose();
+            }
+            edgeLines = [];
+
+            if (result.root) {
+                processNode(result.root, result.meshes, modelGroup, null, '');
+            } else if (result.meshes && result.meshes.length > 0) {
+                processNode({ meshes: Array.from(result.meshes.keys()) }, result.meshes, modelGroup, null, '');
+            }
+
+            const box = new THREE.Box3().setFromObject(modelGroup);
+            if (!box.isEmpty()) {
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+
+                modelGroup.position.x = -center.x;
+                modelGroup.position.y = -center.y;
+                modelGroup.position.z = -center.z;
+
+                scene.children = scene.children.filter(c => !(c instanceof THREE.GridHelper || c instanceof THREE.AxesHelper));
+                
+                camera.position.set(maxDim, maxDim, maxDim * 1.5);
+                controls.target.set(0, 0, 0);
+                
+                camera.near = Math.max(0.1, maxDim * 0.01);
+                camera.far = Math.max(1000, maxDim * 100);
+                camera.updateProjectionMatrix();
+                controls.update();
+
+                const centeredBox = new THREE.Box3().setFromObject(modelGroup);
+                ['x', 'y', 'z'].forEach((axis, idx) => {
+                    const slider = document.getElementById(`clip-${axis}`);
+                    const flipBtn = document.getElementById(`flip-${axis}`);
+                    flipBtn.checked = false; 
+                    
+                    const maxVal = centeredBox.max[axis] || 100;
+                    const minVal = centeredBox.min[axis] || -100;
+                    const range = maxVal - minVal;
+                    
+                    if (range > 0) {
+                        slider.min = minVal - range * 0.1;
+                        slider.max = maxVal + range * 0.1;
+                        slider.step = range / 200;
+                        slider.value = maxVal + range * 0.1; 
+                    }
+                    
+                    const normal = new THREE.Vector3();
+                    if(idx === 0) normal.set(1, 0, 0);
+                    if(idx === 1) normal.set(0, 1, 0);
+                    if(idx === 2) normal.set(0, 0, 1);
+                    
+                    clipPlanes[idx].normal.copy(normal);
+                    clipPlanes[idx].constant = parseFloat(slider.value);
+                    document.getElementById(`val-clip-${axis}`).innerText = parseFloat(slider.value).toFixed(1);
+                });
+
+                updatePartsList();
+            }
+        }
+
+        function updatePartsList() {
+            const listEl = document.getElementById('parts-list');
+            listEl.innerHTML = '';
+            
+            let unnamedCount = 1;
+            let nameCounts = {};
+            
+            modelGroup.traverse((child) => {
+                if (child.isMesh && child.material && child.material.side === THREE.FrontSide) {
+                    let partName = child.name;
+                    if (!partName) {
+                        partName = `部品 ${unnamedCount++}`;
+                    } else {
+                        if (nameCounts[partName] === undefined) nameCounts[partName] = 0;
+                        nameCounts[partName]++;
+                        if (nameCounts[partName] > 1) partName = `${partName} (${nameCounts[partName]})`;
+                    }
+                    
+                    const label = document.createElement('label');
+                    label.className = "flex items-start gap-2 text-gray-300 cursor-pointer hover:bg-gray-700/50 p-1.5 rounded transition-colors text-xs";
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = child.visible;
+                    checkbox.className = "part-checkbox mt-0.5 rounded bg-gray-900 border-gray-600 text-blue-500 w-3.5 h-3.5 cursor-pointer shrink-0";
+                    checkbox.meshRef = child;
+                    
+                    checkbox.addEventListener('change', (e) => {
+                        child.visible = e.target.checked;
+                        if (child.userData.backMesh) child.userData.backMesh.visible = e.target.checked;
+                    });
+                    
+                    const span = document.createElement('span');
+                    span.className = "break-all leading-tight";
+                    span.innerText = partName;
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(span);
+                    listEl.appendChild(label);
+                }
+            });
+            
+            document.getElementById('parts-tree-container').classList.remove('hidden');
+            document.getElementById('parts-tree-container').classList.add('flex');
+            allPartsVisible = true;
+        }
+
+        function addClippingEdge(material) {
+            material.onBeforeCompile = function ( shader ) {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <clipping_planes_fragment>',
+                    `
+                    #include <clipping_planes_fragment>
+                    #if NUM_CLIPPING_PLANES > 0
+                        bool isNearClipEdge = false;
+                        vec4 _plane;
+                        float _clip_dist;
+                        #pragma unroll_loop_start
+                        for ( int i = 0; i < UNION_CLIPPING_PLANES; i ++ ) {
+                            _plane = clippingPlanes[ i ];
+                            _clip_dist = _plane.w - dot( vClipPosition, _plane.xyz );
+                            if ( _clip_dist > 0.0 && _clip_dist < fwidth(_clip_dist) * 1.5 ) {
+                                isNearClipEdge = true;
+                            }
+                        }
+                        #pragma unroll_loop_end
+                    #endif
+                    `
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <dithering_fragment>',
+                    `
+                    #include <dithering_fragment>
+                    #if NUM_CLIPPING_PLANES > 0
+                        if ( isNearClipEdge ) {
+                            gl_FragColor = vec4( 0.05, 0.05, 0.05, 1.0 );
+                        }
+                    #endif
+                    `
+                );
+            };
+        }
+
+        function processNode(node, occtMeshes, parentGroup, inheritedColor = null, inheritedName = '') {
+            let group = new THREE.Group();
+            
+            let nodeName = node.name || (node.attributes && node.attributes.name) || (node.attributes && node.attributes.label) || '';
+            group.name = nodeName;
+
+            let nodeColor = inheritedColor;
+            if (node.color && node.color.length >= 3) {
+                nodeColor = new THREE.Color().setRGB(node.color[0], node.color[1], node.color[2]);
+            } else if (node.attributes && node.attributes.color && node.attributes.color.length >= 3) {
+                nodeColor = new THREE.Color().setRGB(node.attributes.color[0], node.attributes.color[1], node.attributes.color[2]);
+            }
+            
+            if (node.meshes) {
+                for (let meshIndex of node.meshes) {
+                    let occtMesh = occtMeshes[meshIndex];
+                    let geometry = new THREE.BufferGeometry();
+                    
+                    if (occtMesh.attributes.position && occtMesh.attributes.position.array) {
+                        geometry.setAttribute('position', new THREE.Float32BufferAttribute(occtMesh.attributes.position.array, 3));
+                    }
+                    if (occtMesh.attributes.normal && occtMesh.attributes.normal.array) {
+                        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(occtMesh.attributes.normal.array, 3));
+                    } else {
+                        geometry.computeVertexNormals();
+                    }
+                    if (occtMesh.index && occtMesh.index.array) {
+                        geometry.setIndex(new THREE.Uint32BufferAttribute(occtMesh.index.array, 1));
+                    } else if (occtMesh.attributes.index && occtMesh.attributes.index.array) {
+                        geometry.setIndex(new THREE.Uint32BufferAttribute(occtMesh.attributes.index.array, 1));
+                    }
+                    
+                    let meshColor = null;
+                    if (occtMesh.color && occtMesh.color.length >= 3) {
+                        meshColor = new THREE.Color().setRGB(occtMesh.color[0], occtMesh.color[1], occtMesh.color[2]);
+                    } else if (occtMesh.attributes && occtMesh.attributes.color && occtMesh.attributes.color.length >= 3) {
+                        meshColor = new THREE.Color().setRGB(occtMesh.attributes.color[0], occtMesh.attributes.color[1], occtMesh.attributes.color[2]);
+                    }
+
+                    let finalColor = meshColor || nodeColor || new THREE.Color(0xd0d0d0);
+                    let meshName = occtMesh.name || (occtMesh.attributes && occtMesh.attributes.name) || (occtMesh.attributes && occtMesh.attributes.label) || '';
+                    let finalName = meshName || nodeName || inheritedName || '';
+                    
+                    let materialFront = new THREE.MeshPhysicalMaterial({ 
+                        color: finalColor,
+                        metalness: 0.2,
+                        roughness: 0.4,
+                        clearcoat: 0.1,
+                        side: THREE.FrontSide,
+                        polygonOffset: true,
+                        polygonOffsetFactor: 2.0, 
+                        polygonOffsetUnits: 2.0,
+                        clippingPlanes: clipPlanes,
+                        clipIntersection: false
+                    });
+                    addClippingEdge(materialFront);
+                    
+                    let meshFront = new THREE.Mesh(geometry, materialFront);
+                    meshFront.name = finalName;
+                    group.add(meshFront);
+
+                    let backColor = finalColor.clone().multiplyScalar(0.5);
+                    let materialBack = new THREE.MeshBasicMaterial({
+                        color: backColor,
+                        side: THREE.BackSide,
+                        clippingPlanes: clipPlanes,
+                        clipIntersection: false
+                    });
+                    addClippingEdge(materialBack);
+
+                    let meshBack = new THREE.Mesh(geometry, materialBack);
+                    group.add(meshBack);
+
+                    meshFront.userData.backMesh = meshBack;
+
+                    const edges = new THREE.EdgesGeometry(geometry, 15);
+                    const lineMat = new THREE.LineBasicMaterial({ 
+                        color: 0x111111, 
+                        linewidth: 1,
+                        clippingPlanes: clipPlanes 
+                    });
+                    const line = new THREE.LineSegments(edges, lineMat);
+                    line.visible = showEdges;
+                    meshFront.add(line);
+                    edgeLines.push(line);
+                }
+            }
+            
+            let nameToPass = nodeName || inheritedName || '';
+            if (node.children) {
+                for (let child of node.children) {
+                    processNode(child, occtMeshes, group, nodeColor, nameToPass);
+                }
+            }
+            
+            parentGroup.add(group);
+        }
+
+        function showLoading(msg) {
+            overlay.classList.remove('hidden');
+            dropZoneEl.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+            loadingSpinner.style.display = 'flex';
+            errorBox.classList.add('hidden');
+            loadingText.innerText = msg;
+        }
+
+        function showDropZone() {
+            overlay.classList.remove('hidden');
+            dropZoneEl.classList.remove('hidden');
+            loadingSpinner.classList.add('hidden');
+            errorBox.classList.add('hidden');
+            document.getElementById('parts-tree-container').classList.add('hidden');
+            document.getElementById('parts-tree-container').classList.remove('flex');
+        }
+
+        function showError(msg) {
+            overlay.classList.remove('hidden');
+            dropZoneEl.classList.add('hidden');
+            loadingSpinner.classList.add('hidden');
+            errorBox.classList.remove('hidden');
+            errorText.innerText = msg;
+            document.getElementById('parts-tree-container').classList.add('hidden');
+            document.getElementById('parts-tree-container').classList.remove('flex');
+        }
+
+        function hideOverlay() {
+            overlay.classList.add('hidden');
+            dropZoneEl.classList.add('hidden');
+            loadingSpinner.classList.add('hidden');
+            errorBox.classList.add('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
